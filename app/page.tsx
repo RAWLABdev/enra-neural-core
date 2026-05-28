@@ -1,27 +1,26 @@
 import EnraBrain from "@/components/brain/EnraBrain";
+import NeuralBackground from "@/components/enra/NeuralBackground";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center overflow-hidden relative">
-      {/* Glow background */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,255,255,0.08),transparent_70%)]" />
+    <main className="relative min-h-screen overflow-hidden bg-black text-white flex items-center justify-center">
+      <NeuralBackground />
 
-      {/* Content */}
-      <div className="z-10 flex flex-col items-center gap-6">
-        <h1 className="text-7xl font-bold tracking-[0.4em] text-cyan-300">
-          ENRA
-        </h1>
-
-        <p className="text-cyan-100/60 uppercase tracking-[0.3em] text-sm">
+      <section className="relative z-10 flex flex-col items-center gap-6">
+        <p className="text-xs tracking-[0.5em] text-cyan-300/60 uppercase">
           Neural Core Online
         </p>
 
+        <h1 className="text-6xl md:text-8xl font-bold tracking-[0.35em] text-cyan-200 drop-shadow-[0_0_24px_rgba(34,211,238,0.65)]">
+          ENRA
+        </h1>
+
         <EnraBrain />
 
-        <div className="text-cyan-400/40 text-xs tracking-[0.4em]">
+        <p className="text-xs tracking-[0.45em] text-cyan-300/40 uppercase">
           Emma • Nuria • Rau
-        </div>
-      </div>
+        </p>
+      </section>
     </main>
   );
 }
