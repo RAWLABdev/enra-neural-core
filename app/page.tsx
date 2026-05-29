@@ -1,26 +1,16 @@
-import EnraBrain from "@/components/brain/EnraBrain";
+import EnraCoreBubble from "@/components/enra/EnraCoreBubble";
 import NeuralBackground from "@/components/enra/NeuralBackground";
 
 export default function Home() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-black text-white flex items-center justify-center">
+    <main className="relative flex h-screen w-screen items-center justify-center overflow-hidden bg-black text-white">
       <NeuralBackground />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.32)_75%)]" />
 
-      <section className="relative z-10 flex flex-col items-center gap-6">
-        <p className="text-xs tracking-[0.5em] text-cyan-300/60 uppercase">
-          Neural Core Online
-        </p>
-
-        <h1 className="text-6xl md:text-8xl font-bold tracking-[0.35em] text-cyan-200 drop-shadow-[0_0_24px_rgba(34,211,238,0.65)]">
-          ENRA
-        </h1>
-
-        <EnraBrain />
-
-        <p className="text-xs tracking-[0.45em] text-cyan-300/40 uppercase">
-          Emma • Nuria • Rau
-        </p>
-      </section>
+      <div className="pointer-events-none absolute inset-0 opacity-[0.03] mix-blend-soft-light">
+        <div className="h-full w-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+      </div>
+      <EnraCoreBubble />
     </main>
   );
 }
