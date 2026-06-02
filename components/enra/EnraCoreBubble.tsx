@@ -1,6 +1,7 @@
 "use client";
 
 import NeuralBrain3D from "@/components/enra/NeuralBrain3D";
+import { supabase } from "@/lib/supabase";
 import { AnimatePresence, motion } from "framer-motion";
 import { Mic, Send } from "lucide-react";
 import { useState } from "react";
@@ -22,23 +23,102 @@ export default function EnraCoreBubble() {
     },
   ]);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
     if (!input.trim()) return;
+
+    const userMessage = input;
 
     setExpanded(true);
 
     setMessages((prev) => [
       ...prev,
-      { role: "user", content: input },
       {
-        role: "assistant",
-        content: "Message received. Ollama intelligence layer pending.",
+        role: "user",
+        content: userMessage,
       },
     ]);
 
     setInput("");
+
+    const { error: userInsertError } = await supabase
+      .from("enra_messages")
+      .insert({
+        role: "user",
+        content: userMessage,
+      });
+
+    if (userInsertError) {
+      console.error(
+  "ENRA_SUPABASE_USER_INSERT_ERROR",
+  JSON.stringify(userInsertError, null, 2)
+);
+    }
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: userMessage,
+        }),
+      });
+
+      const data = await response.json();
+
+      const assistantMessage =
+        data.content ?? "ENRA could not generate a response.";
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: assistantMessage,
+        },
+      ]);
+
+      const { error: assistantInsertError } = await supabase
+        .from("enra_messages")
+        .insert({
+          role: "assistant",
+          content: assistantMessage,
+        });
+
+      if (assistantInsertError) {
+        console.error(
+          "ENRA_SUPABASE_ASSISTANT_INSERT_ERROR",
+          assistantInsertError
+        );
+      }
+    } catch (error) {
+      console.error("ENRA_CHAT_ERROR", error);
+
+      const errorMessage = "ENRA local neural network unavailable.";
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: errorMessage,
+        },
+      ]);
+
+      const { error: errorInsertError } = await supabase
+        .from("enra_messages")
+        .insert({
+          role: "assistant",
+          content: errorMessage,
+        });
+
+      if (errorInsertError) {
+        console.error("ENRA_SUPABASE_ERROR_INSERT_ERROR", errorInsertError);
+      }
+    }
   };
 
   return (
@@ -85,102 +165,87 @@ export default function EnraCoreBubble() {
             <span className="h-px w-10 bg-gradient-to-l from-transparent to-cyan-300/40" />
           </motion.div>
 
-         
-{/* ENRA mathematical logo */}
-<motion.div
-  animate={{ opacity: [0.9, 1, 0.9] }}
-  transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
-  className="relative mt-7 flex w-[520px] items-center justify-center"
->
-  {/* Deep atmospheric glow */}
-<div className="absolute h-[260px] w-[820px] rounded-full bg-cyan-300/10 blur-[140px]" />
+          {/* ENRA mathematical logo */}
+          <motion.div
+            animate={{ opacity: [0.9, 1, 0.9] }}
+            transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
+            className="relative mt-7 flex w-[520px] items-center justify-center"
+          >
+            {/* Deep atmospheric glow */}
+            <div className="absolute h-[260px] w-[820px] rounded-full bg-cyan-300/10 blur-[140px]" />
 
-<div className="absolute h-[180px] w-[620px] rounded-full bg-cyan-200/8 blur-[100px]" />
+            <div className="absolute h-[180px] w-[620px] rounded-full bg-cyan-200/8 blur-[100px]" />
 
-<div className="absolute h-[120px] w-[420px] rounded-full bg-white/6 blur-[70px]" />
+            <div className="absolute h-[120px] w-[420px] rounded-full bg-white/6 blur-[70px]" />
 
-  <div className="relative grid w-[460px] grid-cols-4 place-items-center">
-    {["E", "N", "R", "A"].map((letter, index) => (
-      <motion.span
-  key={letter}
-  animate={{
-    opacity: [0.9, 1, 0.9],
-  }}
-  transition={{
-    duration: 4.6,
-    repeat: Infinity,
-    delay: index * 0.18,
-  }}
-  className="
-    select-none
-    text-center
-    text-[88px]
-    font-extralight
-    leading-none
-    text-cyan-50
-  "
-  style={{
-    transform: "scaleY(0.82)",
-    textShadow: `
-      0 0 6px rgba(255,255,255,0.25),
-      0 0 16px rgba(34,211,238,0.45),
-      0 0 40px rgba(34,211,238,0.25)
-    `,
-  }}
->
-  {letter}
-</motion.span>
+            <div className="relative grid w-[460px] grid-cols-4 place-items-center">
+              {["E", "N", "R", "A"].map((letter, index) => (
+                <motion.span
+                  key={letter}
+                  animate={{
+                    opacity: [0.9, 1, 0.9],
+                  }}
+                  transition={{
+                    duration: 4.6,
+                    repeat: Infinity,
+                    delay: index * 0.18,
+                  }}
+                  className="select-none text-center text-[88px] font-extralight leading-none text-cyan-50"
+                  style={{
+                    transform: "scaleY(0.82)",
+                    textShadow: `
+                      0 0 6px rgba(255,255,255,0.25),
+                      0 0 16px rgba(34,211,238,0.45),
+                      0 0 40px rgba(34,211,238,0.25)
+                    `,
+                  }}
+                >
+                  {letter}
+                </motion.span>
+              ))}
+            </div>
 
-    ))}
-  </div>
-  <div className="pointer-events-none absolute grid w-[460px] grid-cols-4 place-items-center">
-  {["E", "N", "R", "A"].map((letter) => (
-    <span
-      key={letter}
-      className="
-        select-none
-        text-[88px]
-        font-extralight
-        leading-none
-        text-cyan-300/12
-        blur-[26px]
-      "
-      style={{
-        transform: "scaleY(0.82)",
-      }}
-    >
-      {letter}
-    </span>
-  ))}
-</div>
+            <div className="pointer-events-none absolute grid w-[460px] grid-cols-4 place-items-center">
+              {["E", "N", "R", "A"].map((letter) => (
+                <span
+                  key={letter}
+                  className="select-none text-[88px] font-extralight leading-none text-cyan-300/12 blur-[26px]"
+                  style={{
+                    transform: "scaleY(0.82)",
+                  }}
+                >
+                  {letter}
+                </span>
+              ))}
+            </div>
 
-  <div className="absolute top-1/2 h-px w-[430px] -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan-300/18 to-transparent" />
+            <div className="absolute top-1/2 h-px w-[430px] -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan-300/18 to-transparent" />
 
-  <motion.div
-    animate={{ x: [-210, 210], opacity: [0, 0.46, 0] }}
-    transition={{
-      duration: 4.4,
-      repeat: Infinity,
-      ease: "easeInOut",
-      repeatDelay: 2.6,
-    }}
-    className="absolute top-1/2 h-[2px] w-24 -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan-100 to-transparent shadow-[0_0_18px_rgba(34,211,238,0.55)]"
-  />
+            <motion.div
+              animate={{ x: [-210, 210], opacity: [0, 0.46, 0] }}
+              transition={{
+                duration: 4.4,
+                repeat: Infinity,
+                ease: "easeInOut",
+                repeatDelay: 2.6,
+              }}
+              className="absolute top-1/2 h-[2px] w-24 -translate-y-1/2 bg-gradient-to-r from-transparent via-cyan-100 to-transparent shadow-[0_0_18px_rgba(34,211,238,0.55)]"
+            />
 
-  <div className="pointer-events-none absolute grid w-[460px] grid-cols-4 place-items-center">
-    {["E", "N", "R", "A"].map((letter) => (
-      <span
-        key={letter}
-        className="select-none text-[88px] font-thin leading-none text-cyan-300/10 blur-[18px]"
-        style={{
-          transform: "scaleY(0.82)",
-        }}
-      >
-        {letter}
-      </span>
-    ))}
-  </div>
-</motion.div>
+            <div className="pointer-events-none absolute grid w-[460px] grid-cols-4 place-items-center">
+              {["E", "N", "R", "A"].map((letter) => (
+                <span
+                  key={letter}
+                  className="select-none text-[88px] font-thin leading-none text-cyan-300/10 blur-[18px]"
+                  style={{
+                    transform: "scaleY(0.82)",
+                  }}
+                >
+                  {letter}
+                </span>
+              ))}
+            </div>
+          </motion.div>
 
           <div className="mt-5 h-px w-80 bg-gradient-to-r from-transparent via-cyan-300/25 to-transparent" />
 
