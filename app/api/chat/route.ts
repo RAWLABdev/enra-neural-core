@@ -7,34 +7,124 @@ type EnraMemory = {
   importance: number | null;
 };
 
+type EnraMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+  created_at?: string;
+};
+async function extractAndSaveMemory(message: string) {
+  const lower = message.toLowerCase();
+
+  const memoryPatterns = [
+    {
+      match: "mi perra se llama",
+      title: "Dog Name",
+      importance: 10,
+    },
+    {
+      match: "mi hija se llama",
+      title: "Daughter",
+      importance: 10,
+    },
+    {
+      match: "mi objetivo es",
+      title: "Current Goal",
+      importance: 8,
+    },
+    {
+      match: "trabajo como",
+      title: "Profession",
+      importance: 8,
+    },
+    {
+      match: "estoy trabajando en",
+      title: "Current Work",
+      importance: 7,
+    },
+    {
+      match: "quiero recordar que",
+      title: "User Memory",
+      importance: 7,
+    },
+    {
+      match: "recuerda que",
+      title: "User Memory",
+      importance: 7,
+    },
+  ];
+
+  const matchedPattern = memoryPatterns.find((pattern) =>
+    lower.includes(pattern.match)
+  );
+
+  if (!matchedPattern) return;
+
+  const value = message
+    .slice(lower.indexOf(matchedPattern.match) + matchedPattern.match.length)
+    .trim()
+    .replace(/^[:,-]\s*/, "");
+
+  if (!value) return;
+
+  const { error } = await supabaseServer.from("enra_memory").insert({
+    title: matchedPattern.title,
+    content: value,
+    importance: matchedPattern.importance,
+  });
+
+  if (error) {
+    console.error("ENRA_AUTO_MEMORY_ERROR:", JSON.stringify(error, null, 2));
+  } else {
+    console.log("ENRA_AUTO_MEMORY_SAVED:", matchedPattern.title, value);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { message } = await request.json();
 
     console.log("ENRA_REQUEST:", message);
+    await extractAndSaveMemory(message);
 
-    const { data: memories, error: memoryError } =
-  await supabaseServer
-    .from("enra_memory")
-    .select("*");
+    const { data: memories, error: memoryError } = await supabaseServer
+      .from("enra_memory")
+      .select("title, content, importance")
+      .order("importance", { ascending: false })
+      .limit(20);
 
-console.log(
-  "ENRA_MEMORIES:",
-  JSON.stringify(memories, null, 2)
-);
-
-console.log(
-  "ENRA_MEMORY_ERROR:",
-  JSON.stringify(memoryError, null, 2)
-);
+    console.log("ENRA_MEMORIES:", JSON.stringify(memories, null, 2));
+    console.log("ENRA_MEMORY_ERROR:", JSON.stringify(memoryError, null, 2));
 
     const memoryContext =
       memories
-        ?.map(
-          (memory: EnraMemory) =>
-            `- ${memory.title}: ${memory.content}`
-        )
+        ?.map((memory: EnraMemory) => `- ${memory.title}: ${memory.content}`)
         .join("\n") ?? "Sin memoria persistente registrada todavía.";
+
+    const { data: recentMessages, error: recentMessagesError } =
+      await supabaseServer
+        .from("enra_messages")
+        .select("role, content, created_at")
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+    if (recentMessagesError) {
+      console.error(
+        "ENRA_RECENT_MESSAGES_ERROR:",
+        JSON.stringify(recentMessagesError, null, 2)
+      );
+    }
+
+    const conversationHistory =
+      recentMessages
+        ?.reverse()
+        .filter(
+          (msg: EnraMessage) =>
+            msg.role === "user" || msg.role === "assistant"
+        )
+        .map((msg: EnraMessage) => ({
+          role: msg.role,
+          content: msg.content,
+        })) ?? [];
 
     const response = await fetch("http://localhost:11434/api/chat", {
       method: "POST",
@@ -104,6 +194,7 @@ Cuando Rau salude, responde con identidad ENRA, por ejemplo:
 "Hola Rau. ENRA está operativo. ¿Qué quieres construir ahora?"
 `,
           },
+          ...conversationHistory,
           {
             role: "user",
             content: message,
