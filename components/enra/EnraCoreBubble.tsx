@@ -1,124 +1,399 @@
 "use client";
 
 import NeuralBrain3D from "@/components/enra/NeuralBrain3D";
+
 import { supabase } from "@/lib/supabase";
+
 import { AnimatePresence, motion } from "framer-motion";
+
 import { Mic, Send } from "lucide-react";
-import { useState } from "react";
+
+import { useRef, useState } from "react";
 
 type Message = {
+
   role: "user" | "assistant";
+
   content: string;
+
 };
+
+type SpeechRecognitionEvent = Event & {
+
+  results: SpeechRecognitionResultList;
+
+};
+
+type SpeechRecognitionErrorEvent = Event & {
+
+  error: string;
+
+};
+
+type BrowserSpeechRecognition = {
+
+  lang: string;
+
+  continuous: boolean;
+
+  interimResults: boolean;
+
+  start: () => void;
+
+  stop: () => void;
+
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+
+  onend: (() => void) | null;
+
+};
+
+type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+declare global {
+
+  interface Window {
+
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+
+    SpeechRecognition?: SpeechRecognitionConstructor;
+
+  }
+
+}
 
 const bars = [8, 14, 22, 12, 28, 16, 10, 20, 12];
 
 export default function EnraCoreBubble() {
+
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+
+  const [wakeMode, setWakeMode] = useState(false);
+
+  const [isListening, setIsListening] = useState(false);
+
   const [input, setInput] = useState("");
+
   const [expanded, setExpanded] = useState(false);
+
   const [messages, setMessages] = useState<Message[]>([
+
     {
+
       role: "assistant",
+
       content: "ENRA Neural Core online. Local intelligence mode active.",
+
     },
+
   ]);
 
-  const handleSubmit = async (
-    event: React.FormEvent<HTMLFormElement>
-  ) => {
-    event.preventDefault();
+  const speak = (text: string) => {
 
-    if (!input.trim()) return;
+    const utterance = new SpeechSynthesisUtterance(text);
 
-    const userMessage = input;
+    utterance.lang = "es-CL";
+
+    utterance.rate = 0.95;
+
+    utterance.pitch = 0.9;
+
+    window.speechSynthesis.cancel();
+
+    window.speechSynthesis.speak(utterance);
+
+  };
+
+  const detectWakeWord = (text: string) => {
+
+    const normalized = text
+
+      .toLowerCase()
+
+      .normalize("NFD")
+
+      .replace(/[\u0300-\u036f]/g, "");
+
+    const wakeWords = ["enrra", "enra", "entra", "endra", "en la", "en a"];
+
+    return wakeWords.find((word) => normalized.includes(word));
+
+  };
+
+  const sendMessage = async (userMessage: string) => {
+
+    if (!userMessage.trim()) return;
 
     setExpanded(true);
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "user",
-        content: userMessage,
-      },
-    ]);
+    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
 
     setInput("");
 
-    const { error: userInsertError } = await supabase
-      .from("enra_messages")
-      .insert({
-        role: "user",
-        content: userMessage,
-      });
+    await supabase.from("enra_messages").insert({
 
-    if (userInsertError) {
-      console.error(
-  "ENRA_SUPABASE_USER_INSERT_ERROR",
-  JSON.stringify(userInsertError, null, 2)
-);
-    }
+      role: "user",
+
+      content: userMessage,
+
+    });
 
     try {
+
       const response = await fetch("/api/chat", {
+
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: userMessage,
-        }),
+
+        headers: { "Content-Type": "application/json" },
+
+        body: JSON.stringify({ message: userMessage }),
+
       });
 
       const data = await response.json();
 
       const assistantMessage =
+
         data.content ?? "ENRA could not generate a response.";
 
       setMessages((prev) => [
+
         ...prev,
+
         {
+
           role: "assistant",
+
           content: assistantMessage,
+
         },
+
       ]);
 
-      const { error: assistantInsertError } = await supabase
-        .from("enra_messages")
-        .insert({
-          role: "assistant",
-          content: assistantMessage,
-        });
+      speak(assistantMessage);
 
-      if (assistantInsertError) {
-        console.error(
-          "ENRA_SUPABASE_ASSISTANT_INSERT_ERROR",
-          assistantInsertError
-        );
-      }
+      await supabase.from("enra_messages").insert({
+
+        role: "assistant",
+
+        content: assistantMessage,
+
+      });
+
     } catch (error) {
+
       console.error("ENRA_CHAT_ERROR", error);
 
       const errorMessage = "ENRA local neural network unavailable.";
 
       setMessages((prev) => [
+
         ...prev,
+
         {
+
           role: "assistant",
+
           content: errorMessage,
+
         },
+
       ]);
 
-      const { error: errorInsertError } = await supabase
-        .from("enra_messages")
-        .insert({
-          role: "assistant",
-          content: errorMessage,
-        });
+      speak(errorMessage);
 
-      if (errorInsertError) {
-        console.error("ENRA_SUPABASE_ERROR_INSERT_ERROR", errorInsertError);
-      }
     }
+
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+
+    event.preventDefault();
+
+    await sendMessage(input);
+
+  };
+
+  const handleVoiceInput = () => {
+
+    const SpeechRecognition =
+
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+
+      const message =
+
+        "El reconocimiento de voz no está disponible en este navegador. Prueba con Chrome.";
+
+      setMessages((prev) => [
+
+        ...prev,
+
+        {
+
+          role: "assistant",
+
+          content: message,
+
+        },
+
+      ]);
+
+      speak(message);
+
+      return;
+
+    }
+
+    if (wakeMode && recognitionRef.current) {
+
+      recognitionRef.current.stop();
+
+      recognitionRef.current = null;
+
+      setWakeMode(false);
+
+      setIsListening(false);
+
+      return;
+
+    }
+
+    const recognition = new SpeechRecognition();
+
+    recognitionRef.current = recognition;
+
+    recognition.lang = "es-CL";
+
+    recognition.continuous = true;
+
+    recognition.interimResults = false;
+
+    setWakeMode(true);
+
+    setIsListening(true);
+
+    recognition.onresult = async (event: SpeechRecognitionEvent) => {
+
+      const lastResult = event.results[event.results.length - 1][0].transcript;
+
+      const transcript = lastResult.toLowerCase().trim();
+
+      const wakeWord = detectWakeWord(transcript);
+
+      if (!wakeWord) return;
+
+      const command = transcript.replace(wakeWord, "").trim();
+
+      if (!command) {
+
+        const wakeResponse = "Rau, te escucho.";
+
+        setExpanded(true);
+
+        setMessages((prev) => [
+
+          ...prev,
+
+          {
+
+            role: "assistant",
+
+            content: wakeResponse,
+
+          },
+
+        ]);
+
+        speak(wakeResponse);
+
+        return;
+
+      }
+
+      await sendMessage(command);
+
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+
+      if (event.error === "aborted" || event.error === "no-speech") {
+
+        return;
+
+      }
+
+      if (event.error === "audio-capture") {
+
+        const message =
+
+          "No puedo acceder al micrófono. Revisa los permisos de Chrome y macOS.";
+
+        setMessages((prev) => [
+
+          ...prev,
+
+          {
+
+            role: "assistant",
+
+            content: message,
+
+          },
+
+        ]);
+
+        speak(message);
+
+        setIsListening(false);
+
+        setWakeMode(false);
+
+        return;
+
+      }
+
+      console.error("ENRA_SPEECH_ERROR", event.error);
+
+      setIsListening(false);
+
+      setWakeMode(false);
+
+    };
+
+    recognition.onend = () => {
+
+      if (!recognitionRef.current || !wakeMode) {
+
+        setIsListening(false);
+
+        return;
+
+      }
+
+      window.setTimeout(() => {
+
+        try {
+
+          recognition.start();
+
+        } catch {
+
+          setIsListening(false);
+
+          setWakeMode(false);
+
+        }
+
+      }, 450);
+
+    };
+
+    recognition.start();
+
   };
 
   return (
@@ -325,7 +600,12 @@ export default function EnraCoreBubble() {
 
             <button
               type="button"
-              className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-cyan-300/14 bg-cyan-300/8 text-cyan-200 shadow-[0_0_18px_rgba(34,211,238,0.14)] transition hover:bg-cyan-300/16"
+              onClick={handleVoiceInput}
+              className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-cyan-200 transition ${
+                isListening
+                  ? "border-cyan-200/60 bg-cyan-300/25 shadow-[0_0_28px_rgba(34,211,238,0.7)]"
+                  : "border-cyan-300/14 bg-cyan-300/8 shadow-[0_0_18px_rgba(34,211,238,0.14)] hover:bg-cyan-300/16"
+              }`}
             >
               <Mic size={19} strokeWidth={1.8} />
             </button>
@@ -334,7 +614,13 @@ export default function EnraCoreBubble() {
               value={input}
               onFocus={() => setExpanded(true)}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Neural link ready"
+              placeholder={
+                wakeMode
+                  ? "Wake mode: di ENRA..."
+                  : isListening
+                    ? "Listening..."
+                    : "Neural link ready"
+              }
               className="relative z-10 mx-4 flex-1 bg-transparent text-center text-[13px] tracking-[0.12em] text-cyan-50 outline-none placeholder:text-center placeholder:text-cyan-300/28"
             />
 
