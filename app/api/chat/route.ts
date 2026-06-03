@@ -12,6 +12,7 @@ type EnraMessage = {
   content: string;
   created_at?: string;
 };
+
 async function extractAndSaveMemory(message: string) {
   const lower = message.toLowerCase();
 
@@ -54,7 +55,7 @@ async function extractAndSaveMemory(message: string) {
   ];
 
   const matchedPattern = memoryPatterns.find((pattern) =>
-    lower.includes(pattern.match)
+    lower.includes(pattern.match),
   );
 
   if (!matchedPattern) return;
@@ -79,11 +80,66 @@ async function extractAndSaveMemory(message: string) {
   }
 }
 
+function extractTaskTitle(message: string) {
+  return message
+    .replace(/enrra/gi, "")
+    .replace(/enra/gi, "")
+    .replace(/agrega tarea/gi, "")
+    .replace(/crear tarea/gi, "")
+    .replace(/nueva tarea/gi, "")
+    .trim()
+    .replace(/^[:,-]\s*/, "");
+}
+
 export async function POST(request: Request) {
   try {
     const { message } = await request.json();
 
     console.log("ENRA_REQUEST:", message);
+
+    const lowerMessage = message.toLowerCase();
+
+    if (
+      lowerMessage.includes("agrega tarea") ||
+      lowerMessage.includes("crear tarea") ||
+      lowerMessage.includes("nueva tarea")
+    ) {
+      const taskTitle = extractTaskTitle(message);
+
+      console.log("ENRA_ACTION_CREATE_TASK:", taskTitle);
+
+      return NextResponse.json({
+        action: "create_task",
+        content: message,
+        taskTitle,
+      });
+    }
+
+    if (
+      lowerMessage.includes("qué tareas tengo") ||
+      lowerMessage.includes("que tareas tengo") ||
+      lowerMessage.includes("tareas pendientes") ||
+      lowerMessage.includes("qué tengo pendiente") ||
+      lowerMessage.includes("que tengo pendiente")
+    ) {
+      console.log("ENRA_ACTION_GET_TASKS");
+
+      return NextResponse.json({
+        action: "get_tasks",
+      });
+    }
+
+    if (
+  lowerMessage.includes("completa tarea") ||
+  lowerMessage.includes("marcar tarea") ||
+  lowerMessage.includes("terminé tarea")
+) {
+  return NextResponse.json({
+    action: "complete_task",
+    content: message,
+  });
+}
+
     await extractAndSaveMemory(message);
 
     const { data: memories, error: memoryError } = await supabaseServer
@@ -110,7 +166,7 @@ export async function POST(request: Request) {
     if (recentMessagesError) {
       console.error(
         "ENRA_RECENT_MESSAGES_ERROR:",
-        JSON.stringify(recentMessagesError, null, 2)
+        JSON.stringify(recentMessagesError, null, 2),
       );
     }
 
@@ -118,8 +174,7 @@ export async function POST(request: Request) {
       recentMessages
         ?.reverse()
         .filter(
-          (msg: EnraMessage) =>
-            msg.role === "user" || msg.role === "assistant"
+          (msg: EnraMessage) => msg.role === "user" || msg.role === "assistant",
         )
         .map((msg: EnraMessage) => ({
           role: msg.role,
@@ -223,7 +278,7 @@ Cuando Rau salude, responde con identidad ENRA, por ejemplo:
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }

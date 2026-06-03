@@ -144,6 +144,118 @@ export default function EnraCoreBubble() {
       });
 
       const data = await response.json();
+     console.log("ENRA_FRONT_RESPONSE", data);
+
+if (data.action === "create_task") {
+  const taskTitle = data.taskTitle || "Tarea sin título";
+
+  const { error } = await supabase.from("enra_tasks").insert({
+  title: taskTitle,
+  completed: false,
+  priority: "normal",
+});
+
+  if (error) {
+    console.error(
+      "ENRA_TASK_INSERT_ERROR",
+      JSON.stringify(error, null, 2)
+    );
+  }
+
+  const assistantMessage = `Tarea registrada: ${taskTitle}`;
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      role: "assistant",
+      content: assistantMessage,
+    },
+  ]);
+
+  speak(assistantMessage);
+
+  await supabase.from("enra_messages").insert({
+    role: "assistant",
+    content: assistantMessage,
+  });
+
+  return;
+}
+
+if (data.action === "get_tasks") {
+  const { data: tasks, error } = await supabase
+    .from("enra_tasks")
+    .select("*")
+    .eq("completed", false)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(
+      "ENRA_TASKS_READ_ERROR",
+      JSON.stringify(error, null, 2)
+    );
+  }
+
+  const taskList =
+    tasks && tasks.length > 0
+      ? tasks.map((task, index) => `${index + 1}. ${task.title}`).join("\n")
+      : "No tienes tareas pendientes.";
+
+  const assistantMessage =
+    tasks && tasks.length > 0
+      ? `Rau, tienes estas tareas pendientes:\n${taskList}`
+      : "Rau, no tienes tareas pendientes.";
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      role: "assistant",
+      content: assistantMessage,
+    },
+  ]);
+
+  speak(assistantMessage);
+
+  await supabase.from("enra_messages").insert({
+    role: "assistant",
+    content: assistantMessage,
+  });
+
+  return;
+}
+
+if (data.action === "complete_task") {
+  const taskTitle = userMessage
+    .replace(/completa tarea/i, "")
+    .replace(/marcar tarea/i, "")
+    .replace(/terminé tarea/i, "")
+    .trim();
+
+  const { error } = await supabase
+    .from("enra_tasks")
+    .update({ completed: true })
+    .ilike("title", `%${taskTitle}%`);
+
+  if (error) {
+    console.error("ENRA_TASK_COMPLETE_ERROR", JSON.stringify(error, null, 2));
+  }
+
+  const assistantMessage = `Tarea completada: ${taskTitle}`;
+
+  setMessages((prev) => [
+    ...prev,
+    { role: "assistant", content: assistantMessage },
+  ]);
+
+  speak(assistantMessage);
+
+  await supabase.from("enra_messages").insert({
+    role: "assistant",
+    content: assistantMessage,
+  });
+
+  return;
+}
 
       const assistantMessage =
         data.content ?? "ENRA could not generate a response.";
