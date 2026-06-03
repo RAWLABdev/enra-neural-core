@@ -11,27 +11,20 @@ import { Mic, Send } from "lucide-react";
 import { useRef, useState } from "react";
 
 type Message = {
-
   role: "user" | "assistant";
 
   content: string;
-
 };
 
 type SpeechRecognitionEvent = Event & {
-
   results: SpeechRecognitionResultList;
-
 };
 
 type SpeechRecognitionErrorEvent = Event & {
-
   error: string;
-
 };
 
 type BrowserSpeechRecognition = {
-
   lang: string;
 
   continuous: boolean;
@@ -47,28 +40,23 @@ type BrowserSpeechRecognition = {
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
 
   onend: (() => void) | null;
-
 };
 
 type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
 
 declare global {
-
   interface Window {
-
     webkitSpeechRecognition?: SpeechRecognitionConstructor;
 
     SpeechRecognition?: SpeechRecognitionConstructor;
-
   }
-
 }
 
 const bars = [8, 14, 22, 12, 28, 16, 10, 20, 12];
 
 export default function EnraCoreBubble() {
-
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const isSpeakingRef = useRef(false);
 
   const [wakeMode, setWakeMode] = useState(false);
 
@@ -79,35 +67,45 @@ export default function EnraCoreBubble() {
   const [expanded, setExpanded] = useState(false);
 
   const [messages, setMessages] = useState<Message[]>([
-
     {
-
       role: "assistant",
 
       content: "ENRA Neural Core online. Local intelligence mode active.",
-
     },
-
   ]);
 
   const speak = (text: string) => {
+    isSpeakingRef.current = true;
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+    }
 
     const utterance = new SpeechSynthesisUtterance(text);
 
     utterance.lang = "es-CL";
-
     utterance.rate = 0.95;
-
     utterance.pitch = 0.9;
 
+    utterance.onend = () => {
+      isSpeakingRef.current = false;
+
+      if (wakeMode && recognitionRef.current) {
+        window.setTimeout(() => {
+          try {
+            recognitionRef.current?.start();
+          } catch {}
+        }, 600);
+      }
+    };
+
     window.speechSynthesis.cancel();
-
     window.speechSynthesis.speak(utterance);
-
   };
 
   const detectWakeWord = (text: string) => {
-
     const normalized = text
 
       .toLowerCase()
@@ -119,11 +117,9 @@ export default function EnraCoreBubble() {
     const wakeWords = ["enrra", "enra", "entra", "endra", "en la", "en a"];
 
     return wakeWords.find((word) => normalized.includes(word));
-
   };
 
   const sendMessage = async (userMessage: string) => {
-
     if (!userMessage.trim()) return;
 
     setExpanded(true);
@@ -133,123 +129,91 @@ export default function EnraCoreBubble() {
     setInput("");
 
     await supabase.from("enra_messages").insert({
-
       role: "user",
 
       content: userMessage,
-
     });
 
     try {
-
       const response = await fetch("/api/chat", {
-
         method: "POST",
 
         headers: { "Content-Type": "application/json" },
 
         body: JSON.stringify({ message: userMessage }),
-
       });
 
       const data = await response.json();
 
       const assistantMessage =
-
         data.content ?? "ENRA could not generate a response.";
 
       setMessages((prev) => [
-
         ...prev,
 
         {
-
           role: "assistant",
 
           content: assistantMessage,
-
         },
-
       ]);
 
       speak(assistantMessage);
 
       await supabase.from("enra_messages").insert({
-
         role: "assistant",
 
         content: assistantMessage,
-
       });
-
     } catch (error) {
-
       console.error("ENRA_CHAT_ERROR", error);
 
       const errorMessage = "ENRA local neural network unavailable.";
 
       setMessages((prev) => [
-
         ...prev,
 
         {
-
           role: "assistant",
 
           content: errorMessage,
-
         },
-
       ]);
 
       speak(errorMessage);
-
     }
-
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-
     event.preventDefault();
 
     await sendMessage(input);
-
   };
 
   const handleVoiceInput = () => {
-
     const SpeechRecognition =
-
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-
       const message =
-
         "El reconocimiento de voz no está disponible en este navegador. Prueba con Chrome.";
 
       setMessages((prev) => [
-
         ...prev,
 
         {
-
           role: "assistant",
 
           content: message,
-
         },
-
       ]);
 
       speak(message);
 
       return;
-
     }
 
     if (wakeMode && recognitionRef.current) {
-
       recognitionRef.current.stop();
 
       recognitionRef.current = null;
@@ -259,7 +223,6 @@ export default function EnraCoreBubble() {
       setIsListening(false);
 
       return;
-
     }
 
     const recognition = new SpeechRecognition();
@@ -277,7 +240,7 @@ export default function EnraCoreBubble() {
     setIsListening(true);
 
     recognition.onresult = async (event: SpeechRecognitionEvent) => {
-
+      if (isSpeakingRef.current) return;
       const lastResult = event.results[event.results.length - 1][0].transcript;
 
       const transcript = lastResult.toLowerCase().trim();
@@ -289,61 +252,45 @@ export default function EnraCoreBubble() {
       const command = transcript.replace(wakeWord, "").trim();
 
       if (!command) {
-
         const wakeResponse = "Rau, te escucho.";
 
         setExpanded(true);
 
         setMessages((prev) => [
-
           ...prev,
 
           {
-
             role: "assistant",
 
             content: wakeResponse,
-
           },
-
         ]);
 
         speak(wakeResponse);
 
         return;
-
       }
 
       await sendMessage(command);
-
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-
       if (event.error === "aborted" || event.error === "no-speech") {
-
         return;
-
       }
 
       if (event.error === "audio-capture") {
-
         const message =
-
           "No puedo acceder al micrófono. Revisa los permisos de Chrome y macOS.";
 
         setMessages((prev) => [
-
           ...prev,
 
           {
-
             role: "assistant",
 
             content: message,
-
           },
-
         ]);
 
         speak(message);
@@ -353,7 +300,6 @@ export default function EnraCoreBubble() {
         setWakeMode(false);
 
         return;
-
       }
 
       console.error("ENRA_SPEECH_ERROR", event.error);
@@ -361,39 +307,27 @@ export default function EnraCoreBubble() {
       setIsListening(false);
 
       setWakeMode(false);
-
     };
 
     recognition.onend = () => {
-
       if (!recognitionRef.current || !wakeMode) {
-
         setIsListening(false);
 
         return;
-
       }
 
       window.setTimeout(() => {
-
         try {
-
           recognition.start();
-
         } catch {
-
           setIsListening(false);
 
           setWakeMode(false);
-
         }
-
       }, 450);
-
     };
 
     recognition.start();
-
   };
 
   return (
@@ -527,9 +461,27 @@ export default function EnraCoreBubble() {
           <div className="mt-7 flex items-center gap-3">
             <span className="h-1 w-1 rounded-full bg-cyan-300/55 shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
 
-            <p className="text-[10px] uppercase tracking-[0.62em] text-cyan-300/42">
-              Local Intelligence Mode Active
-            </p>
+            <div className="flex flex-col items-center gap-1">
+  <p className="text-[10px] uppercase tracking-[0.62em] text-cyan-300/42">
+    Local Intelligence Mode Active
+  </p>
+
+  <motion.p
+    animate={{
+      opacity: wakeMode ? [0.45, 1, 0.45] : 0.28,
+    }}
+    transition={{
+      duration: 1.8,
+      repeat: wakeMode ? Infinity : 0,
+      ease: "easeInOut",
+    }}
+    className={`text-[9px] uppercase tracking-[0.45em] ${
+      wakeMode ? "text-cyan-200" : "text-cyan-300/25"
+    }`}
+  >
+    {wakeMode ? "Wake Mode Active" : "Wake Mode Off"}
+  </motion.p>
+</div>
 
             <span className="h-1 w-1 rounded-full bg-cyan-300/55 shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
           </div>
