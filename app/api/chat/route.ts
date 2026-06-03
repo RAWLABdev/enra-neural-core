@@ -140,6 +140,51 @@ export async function POST(request: Request) {
   });
 }
 
+if (
+  lowerMessage.includes("qué debo hacer hoy") ||
+  lowerMessage.includes("que debo hacer hoy") ||
+  lowerMessage.includes("plan de hoy") ||
+  lowerMessage.includes("organiza mi día") ||
+  lowerMessage.includes("organiza mi dia")
+) {
+  return NextResponse.json({
+    action: "daily_plan",
+  });
+}
+
+if (
+  lowerMessage.includes("mis objetivos") ||
+  lowerMessage.includes("qué objetivos tengo") ||
+  lowerMessage.includes("que objetivos tengo")
+) {
+  return NextResponse.json({
+    action: "get_goals",
+  });
+}
+
+if (
+  lowerMessage.includes("crea objetivo") ||
+  lowerMessage.includes("crear objetivo") ||
+  lowerMessage.includes("nuevo objetivo")
+) {
+  const goalTitle = message
+    .replace(/enrra/gi, "")
+    .replace(/enra/gi, "")
+    .replace(/crea objetivo/gi, "")
+    .replace(/crear objetivo/gi, "")
+    .replace(/nuevo objetivo/gi, "")
+    .trim()
+    .replace(/^[:,-]\s*/, "");
+
+  console.log("ENRA_ACTION_CREATE_GOAL:", goalTitle);
+
+  return NextResponse.json({
+    action: "create_goal",
+    content: message,
+    goalTitle,
+  });
+}
+
     await extractAndSaveMemory(message);
 
     const { data: memories, error: memoryError } = await supabaseServer

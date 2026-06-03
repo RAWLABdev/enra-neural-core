@@ -257,6 +257,130 @@ if (data.action === "complete_task") {
   return;
 }
 
+if (data.action === "daily_plan") {
+  const { data: tasks, error } = await supabase
+    .from("enra_tasks")
+    .select("*")
+    .eq("completed", false)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  if (error) {
+    console.error(
+      "ENRA_DAILY_PLAN_ERROR",
+      JSON.stringify(error, null, 2)
+    );
+  }
+
+  const taskList =
+    tasks && tasks.length > 0
+      ? tasks.map((task, index) => `${index + 1}. ${task.title}`).join("\n")
+      : "No tienes tareas pendientes registradas.";
+
+  const assistantMessage =
+    tasks && tasks.length > 0
+      ? `Rau, para hoy te recomiendo enfocarte en esto:\n${taskList}`
+      : "Rau, no tienes tareas pendientes. Podríamos definir una prioridad para hoy.";
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      role: "assistant",
+      content: assistantMessage,
+    },
+  ]);
+
+  speak(assistantMessage);
+
+  await supabase.from("enra_messages").insert({
+    role: "assistant",
+    content: assistantMessage,
+  });
+
+  return;
+}
+
+if (data.action === "create_goal") {
+  const goalTitle = data.goalTitle || "Objetivo sin título";
+
+  const { error } = await supabase.from("enra_goals").insert({
+    title: goalTitle,
+    progress: 0,
+  });
+
+  if (error) {
+    console.error(
+      "ENRA_GOAL_INSERT_ERROR",
+      JSON.stringify(error, null, 2)
+    );
+  }
+
+  const assistantMessage = `Objetivo creado: ${goalTitle}`;
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      role: "assistant",
+      content: assistantMessage,
+    },
+  ]);
+
+  speak(assistantMessage);
+
+  await supabase.from("enra_messages").insert({
+    role: "assistant",
+    content: assistantMessage,
+  });
+
+  return;
+}
+
+if (data.action === "get_goals") {
+  const { data: goals, error } = await supabase
+    .from("enra_goals")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(
+      "ENRA_GOALS_READ_ERROR",
+      JSON.stringify(error, null, 2)
+    );
+  }
+
+  const goalList =
+    goals && goals.length > 0
+      ? goals
+          .map(
+            (goal, index) =>
+              `${index + 1}. ${goal.title} (${goal.progress ?? 0}%)`
+          )
+          .join("\n")
+      : "";
+
+  const assistantMessage =
+    goalList.length > 0
+      ? `Rau, estos son tus objetivos:\n${goalList}`
+      : "Rau, aún no tienes objetivos definidos.";
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      role: "assistant",
+      content: assistantMessage,
+    },
+  ]);
+
+  speak(assistantMessage);
+
+  await supabase.from("enra_messages").insert({
+    role: "assistant",
+    content: assistantMessage,
+  });
+
+  return;
+}
+
       const assistantMessage =
         data.content ?? "ENRA could not generate a response.";
 
