@@ -13,6 +13,11 @@ type EnraMessage = {
   created_at?: string;
 };
 
+type EnraProfileItem = {
+  key: string;
+  value: string;
+};
+
 async function extractAndSaveMemory(message: string) {
   const lower = message.toLowerCase();
 
@@ -91,6 +96,21 @@ function extractTaskTitle(message: string) {
     .replace(/^[:,-]\s*/, "");
 }
 
+function extractGoalTitle(message: string) {
+  return message
+    .replace(/enrra/gi, "")
+    .replace(/enra/gi, "")
+    .replace(/crea objetivo/gi, "")
+    .replace(/crear objetivo/gi, "")
+    .replace(/nuevo objetivo/gi, "")
+    .trim()
+    .replace(/^[:,-]\s*/, "");
+}
+
+function getProfileValue(profile: EnraProfileItem[] | null, key: string) {
+  return profile?.find((item) => item.key === key)?.value;
+}
+
 export async function POST(request: Request) {
   try {
     const { message } = await request.json();
@@ -98,6 +118,88 @@ export async function POST(request: Request) {
     console.log("ENRA_REQUEST:", message);
 
     const lowerMessage = message.toLowerCase();
+
+    const { data: profile, error: profileError } = await supabaseServer
+      .from("enra_profile")
+      .select("key, value");
+
+      console.log(
+        "ENRA_PROFILE_DATA:",
+        JSON.stringify(profile, null, 2)
+      );
+
+    if (profileError) {
+      console.error("ENRA_PROFILE_ERROR:", JSON.stringify(profileError, null, 2));
+    }
+
+    console.log("ENRA_PROFILE:", JSON.stringify(profile, null, 2));
+
+    const profileContext =
+      profile
+        ?.map((item: EnraProfileItem) => `${item.key}: ${item.value}`)
+        .join("\n") ?? "Sin perfil estructurado registrado todavía.";
+
+    if (
+      lowerMessage.includes("cuál es mi linkedin") ||
+      lowerMessage.includes("cual es mi linkedin")
+    ) {
+      const linkedin = getProfileValue(profile, "linkedin");
+
+      return NextResponse.json({
+        content: linkedin ?? "No encontré tu LinkedIn en el perfil.",
+      });
+    }
+
+    if (
+      lowerMessage.includes("cuál es mi portafolio") ||
+      lowerMessage.includes("cual es mi portafolio") ||
+      lowerMessage.includes("cuál es mi portfolio") ||
+      lowerMessage.includes("cual es mi portfolio")
+    ) {
+      const portfolio = getProfileValue(profile, "portfolio");
+
+      return NextResponse.json({
+        content: portfolio ?? "No encontré tu portafolio en el perfil.",
+      });
+    }
+
+    if (
+      lowerMessage.includes("cuál es mi github") ||
+      lowerMessage.includes("cual es mi github")
+    ) {
+      const github = getProfileValue(profile, "github");
+
+      return NextResponse.json({
+        content: github ?? "No encontré tu GitHub en el perfil.",
+      });
+    }
+
+    if (
+      lowerMessage.includes("cuál es mi meta de peso") ||
+      lowerMessage.includes("cual es mi meta de peso") ||
+      lowerMessage.includes("peso objetivo")
+    ) {
+      const weightGoal = getProfileValue(profile, "weight_goal");
+
+      return NextResponse.json({
+        content: weightGoal
+          ? `Tu meta de peso es ${weightGoal} kg.`
+          : "No encontré una meta de peso registrada.",
+      });
+    }
+
+    if (
+      lowerMessage.includes("cuál es mi peso actual") ||
+      lowerMessage.includes("cual es mi peso actual")
+    ) {
+      const currentWeight = getProfileValue(profile, "weight_current");
+
+      return NextResponse.json({
+        content: currentWeight
+          ? `Tu peso actual registrado es ${currentWeight} kg.`
+          : "No encontré tu peso actual registrado.",
+      });
+    }
 
     if (
       lowerMessage.includes("agrega tarea") ||
@@ -130,73 +232,66 @@ export async function POST(request: Request) {
     }
 
     if (
-  lowerMessage.includes("completa tarea") ||
-  lowerMessage.includes("marcar tarea") ||
-  lowerMessage.includes("terminé tarea")
-) {
-  return NextResponse.json({
-    action: "complete_task",
-    content: message,
-  });
-}
+      lowerMessage.includes("completa tarea") ||
+      lowerMessage.includes("marcar tarea") ||
+      lowerMessage.includes("terminé tarea")
+    ) {
+      return NextResponse.json({
+        action: "complete_task",
+        content: message,
+      });
+    }
 
-if (
-  lowerMessage.includes("qué debo hacer hoy") ||
-  lowerMessage.includes("que debo hacer hoy") ||
-  lowerMessage.includes("plan de hoy") ||
-  lowerMessage.includes("organiza mi día") ||
-  lowerMessage.includes("organiza mi dia")
-) {
-  return NextResponse.json({
-    action: "daily_plan",
-  });
-}
+    if (
+      lowerMessage.includes("qué debo hacer hoy") ||
+      lowerMessage.includes("que debo hacer hoy") ||
+      lowerMessage.includes("plan de hoy") ||
+      lowerMessage.includes("organiza mi día") ||
+      lowerMessage.includes("organiza mi dia")
+    ) {
+      return NextResponse.json({
+        action: "daily_plan",
+      });
+    }
 
-if (
-  lowerMessage.includes("mis objetivos") ||
-  lowerMessage.includes("qué objetivos tengo") ||
-  lowerMessage.includes("que objetivos tengo")
-) {
-  return NextResponse.json({
-    action: "get_goals",
-  });
-}
+    if (
+      lowerMessage.includes("mis objetivos") ||
+      lowerMessage.includes("qué objetivos tengo") ||
+      lowerMessage.includes("que objetivos tengo")
+    ) {
+      return NextResponse.json({
+        action: "get_goals",
+      });
+    }
 
-if (
-  lowerMessage.includes("crea objetivo") ||
-  lowerMessage.includes("crear objetivo") ||
-  lowerMessage.includes("nuevo objetivo")
-) {
-  const goalTitle = message
-    .replace(/enrra/gi, "")
-    .replace(/enra/gi, "")
-    .replace(/crea objetivo/gi, "")
-    .replace(/crear objetivo/gi, "")
-    .replace(/nuevo objetivo/gi, "")
-    .trim()
-    .replace(/^[:,-]\s*/, "");
+    if (
+      lowerMessage.includes("crea objetivo") ||
+      lowerMessage.includes("crear objetivo") ||
+      lowerMessage.includes("nuevo objetivo")
+    ) {
+      const goalTitle = extractGoalTitle(message);
 
-  console.log("ENRA_ACTION_CREATE_GOAL:", goalTitle);
+      console.log("ENRA_ACTION_CREATE_GOAL:", goalTitle);
 
-  return NextResponse.json({
-    action: "create_goal",
-    content: message,
-    goalTitle,
-  });
-}
+      return NextResponse.json({
+        action: "create_goal",
+        content: message,
+        goalTitle,
+      });
+    }
 
-if (
-  lowerMessage.includes("cuál es mi foco") ||
-  lowerMessage.includes("cual es mi foco") ||
-  lowerMessage.includes("qué debería hacer primero") ||
-  lowerMessage.includes("que deberia hacer primero") ||
-  lowerMessage.includes("en qué me enfoco") ||
-  lowerMessage.includes("en que me enfoco")
-) {
-  return NextResponse.json({
-    action: "focus_mode",
-  });
-}
+    if (
+      lowerMessage.includes("cuál es mi foco") ||
+      lowerMessage.includes("cual es mi foco") ||
+      lowerMessage.includes("qué debería hacer primero") ||
+      lowerMessage.includes("que deberia hacer primero") ||
+      lowerMessage.includes("en qué me enfoco") ||
+      lowerMessage.includes("en que me enfoco")
+    ) {
+      return NextResponse.json({
+        action: "focus_mode",
+      });
+    }
 
     await extractAndSaveMemory(message);
 
@@ -259,6 +354,9 @@ ENRA significa:
 - Rau
 
 Eres el sistema neuronal personal de Rau.
+
+Perfil de Rau:
+${profileContext}
 
 Tu idioma principal es español.
 Responde siempre en español, excepto que Rau pida explícitamente otro idioma.
