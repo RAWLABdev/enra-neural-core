@@ -185,6 +185,19 @@ if (
   });
 }
 
+if (
+  lowerMessage.includes("cuál es mi foco") ||
+  lowerMessage.includes("cual es mi foco") ||
+  lowerMessage.includes("qué debería hacer primero") ||
+  lowerMessage.includes("que deberia hacer primero") ||
+  lowerMessage.includes("en qué me enfoco") ||
+  lowerMessage.includes("en que me enfoco")
+) {
+  return NextResponse.json({
+    action: "focus_mode",
+  });
+}
+
     await extractAndSaveMemory(message);
 
     const { data: memories, error: memoryError } = await supabaseServer
