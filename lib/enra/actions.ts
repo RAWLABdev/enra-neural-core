@@ -173,5 +173,16 @@ export function handleActions(
     };
   }
 
+  if (
+  lowerMessage.includes("coach") ||
+  lowerMessage.includes("modo coach") ||
+  lowerMessage.includes("ayúdame a pensar") ||
+  lowerMessage.includes("ayudame a pensar")
+) {
+  return {
+    action: "coach_mode",
+  };
+}
+
   return null;
 }

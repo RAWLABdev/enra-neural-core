@@ -145,6 +145,48 @@ export default function EnraCoreBubble() {
 
       const data = await response.json();
 
+      if (data.action === "coach_mode") {
+  const assistantMessage = `Rau, activando modo coach.
+
+Para ordenar bien esto, respóndeme con esta estructura:
+
+Situación:
+¿Qué está pasando?
+
+Objetivo:
+¿Qué quieres lograr?
+
+Bloqueadores:
+¿Qué te está frenando?
+
+Resultado esperado:
+¿Qué necesitas que te entregue?
+
+Cuando me respondas eso, ENRA te dará:
+1. Diagnóstico
+2. Prioridad principal
+3. Próxima acción
+4. Riesgos
+5. Plan de 7 días`;
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      role: "assistant",
+      content: assistantMessage,
+    },
+  ]);
+
+  speak(assistantMessage);
+
+  await supabase.from("enra_messages").insert({
+    role: "assistant",
+    content: assistantMessage,
+  });
+
+  return;
+}
+
       if (data.action === "focus_mode") {
   const [tasksRes, goalsRes] = await Promise.all([
     supabase

@@ -24,7 +24,8 @@ export type EnraActionResponse =
         | "daily_plan"
         | "get_goals"
         | "create_goal"
-        | "focus_mode";
+        | "focus_mode"
+        | "coach_mode";
       content?: string;
       taskTitle?: string;
       goalTitle?: string;
