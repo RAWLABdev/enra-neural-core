@@ -173,7 +173,19 @@ export function handleActions(
     };
   }
 
-  if (
+if (
+  lowerMessage.includes("guarda esta sesión coach") ||
+  lowerMessage.includes("guarda esta sesion coach") ||
+  lowerMessage.includes("guardar sesión coach") ||
+  lowerMessage.includes("guardar sesion coach")
+) {
+  return {
+    action: "save_coach_session",
+    content: message,
+  };
+}
+
+ if (
   lowerMessage.includes("coach") ||
   lowerMessage.includes("modo coach") ||
   lowerMessage.includes("ayúdame a pensar") ||

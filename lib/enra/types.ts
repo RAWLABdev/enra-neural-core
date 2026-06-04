@@ -25,7 +25,8 @@ export type EnraActionResponse =
         | "get_goals"
         | "create_goal"
         | "focus_mode"
-        | "coach_mode";
+        | "coach_mode"
+        | "save_coach_session";
       content?: string;
       taskTitle?: string;
       goalTitle?: string;

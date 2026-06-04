@@ -145,6 +145,71 @@ export default function EnraCoreBubble() {
 
       const data = await response.json();
 
+      if (data.action === "save_coach_session") {
+  const rawContent = userMessage
+    .replace(/enrra/gi, "")
+    .replace(/enra/gi, "")
+    .replace(/guarda esta sesión coach/gi, "")
+    .replace(/guarda esta sesion coach/gi, "")
+    .replace(/guardar sesión coach/gi, "")
+    .replace(/guardar sesion coach/gi, "")
+    .trim();
+
+  const getSection = (label: string) => {
+    const regex = new RegExp(
+      `${label}:\\s*([\\s\\S]*?)(?=\\n\\s*(Situación|Situacion|Objetivo|Bloqueadores|Resultado esperado):|$)`,
+      "i"
+    );
+
+    return rawContent.match(regex)?.[1]?.trim() ?? null;
+  };
+
+  const situation =
+    getSection("Situación") ?? getSection("Situacion");
+
+  const objective = getSection("Objetivo");
+
+  const blockers = getSection("Bloqueadores");
+
+  const expectedResult = getSection("Resultado esperado");
+
+  const { error } = await supabase.from("enra_coach_sessions").insert({
+    situation,
+    objective,
+    blockers,
+    expected_result: expectedResult,
+    raw_content: rawContent,
+  });
+
+  if (error) {
+    console.error(
+      "ENRA_COACH_SESSION_INSERT_ERROR",
+      JSON.stringify(error, null, 2)
+    );
+  }
+
+  const assistantMessage = error
+    ? "Rau, no pude guardar la sesión coach."
+    : "Sesión coach guardada.";
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      role: "assistant",
+      content: assistantMessage,
+    },
+  ]);
+
+  speak(assistantMessage);
+
+  await supabase.from("enra_messages").insert({
+    role: "assistant",
+    content: assistantMessage,
+  });
+
+  return;
+}
+
       if (data.action === "coach_mode") {
   const assistantMessage = `Rau, activando modo coach.
 
