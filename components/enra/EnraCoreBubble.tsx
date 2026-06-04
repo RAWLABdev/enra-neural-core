@@ -144,6 +144,62 @@ export default function EnraCoreBubble() {
       });
 
       const data = await response.json();
+
+      if (data.action === "focus_mode") {
+  const [tasksRes, goalsRes] = await Promise.all([
+    supabase
+      .from("enra_tasks")
+      .select("*")
+      .eq("completed", false)
+      .order("created_at", { ascending: false })
+      .limit(5),
+
+    supabase
+      .from("enra_goals")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(3),
+  ]);
+
+  const tasks = tasksRes.data ?? [];
+  const goals = goalsRes.data ?? [];
+
+  const mainGoal =
+    goals[0]?.title ?? "mantener claridad y avanzar paso a paso";
+
+  const firstTask =
+    tasks[0]?.title ?? "definir una tarea concreta para hoy";
+
+  const taskList =
+    tasks.length > 0
+      ? tasks.map((task, index) => `${index + 1}. ${task.title}`).join("\n")
+      : "No hay tareas pendientes registradas.";
+
+  const assistantMessage = `Rau, tu foco principal ahora es: ${mainGoal}.
+
+Primer paso recomendado:
+${firstTask}
+
+Tareas que sostienen ese foco:
+${taskList}`;
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      role: "assistant",
+      content: assistantMessage,
+    },
+  ]);
+
+  speak(assistantMessage);
+
+  await supabase.from("enra_messages").insert({
+    role: "assistant",
+    content: assistantMessage,
+  });
+
+  return;
+}
      console.log("ENRA_FRONT_RESPONSE", data);
 
 if (data.action === "create_task") {
@@ -442,6 +498,8 @@ if (data.action === "complete_task") {
     recognition.start();
   };
 
+  
+
   return (
     <section className="relative z-10 flex items-center justify-center">
       <div className="relative flex h-[min(760px,96vw)] w-[min(760px,96vw)] items-center justify-center">
@@ -594,6 +652,7 @@ if (data.action === "complete_task") {
     {wakeMode ? "Wake Mode Active" : "Wake Mode Off"}
   </motion.p>
 </div>
+
 
             <span className="h-1 w-1 rounded-full bg-cyan-300/55 shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
           </div>
